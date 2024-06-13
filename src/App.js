@@ -14,6 +14,8 @@ const App = () => {
   const [showContainer, setShowContainer] = useState(false);
   const [generatedResponse, setGeneratedResponse] = useState("");
 
+  const recipeCache = {};
+
   const addIngredient = () => {
     const input = document.getElementById("ingredientInput");
     const ingredient = input.value.trim();
@@ -27,6 +29,7 @@ const App = () => {
   };
 
   const deleteIngredient = (index) => {
+    setShowContainer(false);
     setIngredients((prevIngredients) => {
       const updatedIngredients = [...prevIngredients];
       updatedIngredients.splice(index, 1);
@@ -38,22 +41,40 @@ const App = () => {
     setIsLoading(true);
     setShowContainer(false);
     const ingredientsString = [...ingredients];
-    console.log(ingredientsString);
+
+    if (recipeCache[ingredientsString]) {
+      console.log("Using cached recipe");
+      setGeneratedResponse(recipeCache[ingredientsString]);
+      setIsLoading(false);
+      setShowContainer(true);
+      return;
+    }
+    // console.log(ingredientsString);
     const catchyprompt = `"Hey Cohere, I have the following ingredients: ${ingredientsString.join(
       ", "
     )} . Can you suggest a recipe I can make with these ingredients?"`;
 
-    const recipeResponse = await cohere.generate({
-      model: "command",
-      prompt: `${catchyprompt}\n\n`,
-      maxTokens: 300,
-      temperature: 0.9,
-      k: 0,
-      stopSequences: [],
-      returnLikelihoods: "NONE",
-    });
+    try {
+      const recipeResponse = await cohere.generate({
+        model: "command",
+        prompt: `${catchyprompt}\n\n`,
+        maxTokens: 300,
+        temperature: 0.9,
+        k: 0,
+        stopSequences: [],
+        returnLikelihoods: "NONE",
+      });
 
-    setGeneratedResponse(recipeResponse.generations[0].text);
+      const recipeText = recipeResponse.generations[0].text;
+
+      recipeCache[ingredientsString] = recipeText;
+      setGeneratedResponse(recipeText);
+    } catch (error) {
+      console.error("Error generating recipe:", error);
+      setGeneratedResponse(
+        "Sorry, we couldn't generate a recipe at this time. Please try again later."
+      );
+    }
 
     // const recipeContainer = document.getElementById("recipeContainer");
     // console.log(recipeResponse);
@@ -90,7 +111,7 @@ const App = () => {
         disabled={isLoading}
         className="generate-button"
       >
-        Generate Recipe
+        {isLoading ? "Generating Recipe" : "Generate Recipe"}
       </button>
       {isLoading ? (
         <SpinnerComp />
